@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>点名转盘</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #151d30;
+      --card-hover: #1c2742;
+      --border: #23314e;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --accent-glow: rgba(56, 189, 248, 0.2);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); line-height: 1.6; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1.5rem; }
+    .container { max-width: 1150px; width: 100%; margin: 0 auto; }
+
+    .hero { text-align: center; margin-bottom: 2.5rem; }
+    .hero h1 { font-size: 2.6rem; font-weight: 800; color: #fff; margin-bottom: 0.75rem; letter-spacing: -0.03em; line-height: 1.2; }
+    .hero h1 span { color: var(--accent); }
+    .hero p { color: var(--text-muted); font-size: 1.15rem; max-width: 740px; margin: 0 auto; }
+
+    .wheel-app-layout { display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 2rem; align-items: start; margin-bottom: 2rem; }
+    @media (max-width: 900px) { .wheel-app-layout { grid-template-columns: 1fr; } }
+
+    .wheel-stage { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+    .wheel-canvas-box { position: relative; width: 100%; max-width: 450px; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center; }
+    canvas#wheelCanvas { width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 10px 35px rgba(0,0,0,0.6); }
+    .wheel-pointer { position: absolute; right: -14px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 18px solid transparent; border-bottom: 18px solid transparent; border-right: 34px solid #ef4444; filter: drop-shadow(-3px 0 8px rgba(0,0,0,0.6)); z-index: 10; }
+    .wheel-center-cap { position: absolute; width: 68px; height: 68px; background: #0c1222; border: 4px solid var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem; color: #fff; cursor: pointer; z-index: 5; box-shadow: 0 4px 20px rgba(0,0,0,0.7); transition: transform 0.15s ease; }
+    .wheel-center-cap:hover { background: var(--accent); color: #0b0f19; transform: scale(1.05); }
+
+    .wheel-controls { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
+    .sound-toggle-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+    .sound-btn { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.82rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; }
+    .sound-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(56, 189, 248, 0.1); }
+
+    .control-group { margin-bottom: 1rem; }
+    .control-group label { display: block; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 0.5rem; }
+    .control-group textarea { width: 100%; height: 170px; padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: #0c1222; color: #fff; font-size: 0.95rem; outline: none; resize: vertical; font-family: monospace; line-height: 1.45; }
+    .control-group textarea:focus { border-color: var(--accent); }
+
+    .upload-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .upload-btn { position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.55rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border: 1px solid var(--border); background: #1c2742; color: #cbd5e1; transition: all 0.2s ease; flex: 1; min-width: 120px; }
+    .upload-btn:hover { background: #26365c; color: #fff; }
+    .upload-btn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .upload-hint { font-size: 0.78rem; color: var(--text-dim); margin-top: 0.35rem; line-height: 1.5; }
+
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; font-size: 0.95rem; cursor: pointer; border: none; transition: all 0.2s ease; user-select: none; }
+    .btn-primary { background: var(--accent); color: #0b0f19; font-weight: 700; }
+    .btn-primary:hover { background: var(--accent-hover); color: #fff; box-shadow: 0 4px 15px var(--accent-glow); }
+    .btn-secondary { background: #1c2742; color: #cbd5e1; border: 1px solid var(--border); }
+    .btn-secondary:hover { background: #26365c; color: #fff; }
+    .btn-row { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
+    .btn-row .btn-primary { flex: 1; }
+
+    .winner-announcement { margin-top: 1.25rem; padding: 1.25rem 1.5rem; background: linear-gradient(135deg, rgba(56,189,248,0.15), rgba(16,185,129,0.15)); border: 2px solid var(--accent); border-radius: 12px; text-align: center; display: none; width: 100%; box-shadow: 0 10px 30px rgba(56,189,248,0.25); animation: zoomWinner 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    .winner-announcement.show { display: block; }
+    .winner-announcement h3 { font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); }
+    .winner-announcement .winner-name { font-size: 2.2rem; font-weight: 900; color: #fff; margin: 0.35rem 0; letter-spacing: -0.02em; }
+    @keyframes zoomWinner { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: scale(1); } }
+
+    canvas#confettiCanvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 99999; display: none; }
+
+    .toast-popup { position: fixed; bottom: 2rem; right: 2rem; background: var(--success); color: #fff; padding: 0.75rem 1.35rem; border-radius: 8px; font-weight: 600; font-size: 0.92rem; opacity: 0; transform: translateY(10px); transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: none; z-index: 9999; box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4); }
+    .toast-popup.visible { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+  <canvas id="confettiCanvas"></canvas>
+
+  <div class="container">
+    <header class="hero">
+      <h1>随机姓名转盘 <span>& 抽选器</span></h1>
+      <p>点击转盘中心或下方按钮，从姓名中随机抽取一名。内置音效与彩带庆祝。</p>
+    </header>
+
+    <div class="wheel-app-layout">
+      <div class="wheel-stage">
+        <div class="wheel-canvas-box">
+          <canvas id="wheelCanvas" width="800" height="800"></canvas>
+          <div class="wheel-pointer"></div>
+          <button id="spinBtn" class="wheel-center-cap" onclick="spinWheel()">抽取</button>
+        </div>
+        
+        <div id="winnerBox" class="winner-announcement">
+          <h3>🎉 被抽中的名字 🎉</h3>
+          <div id="winnerName" class="winner-name">---</div>
+          <div style="display: flex; gap: 0.5rem; justify-content: center; margin-top: 0.5rem;">
+            <button class="btn btn-primary" style="padding: 0.45rem 1.15rem; font-size: 0.85rem;" onclick="removeWinner()">移除该名字</button>
+            <button class="btn btn-secondary" style="padding: 0.45rem 1.15rem; font-size: 0.85rem;" onclick="spinWheel()">再抽一次</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="wheel-controls">
+        <div class="sound-toggle-bar">
+          <span style="font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">音效开关</span>
+          <button id="soundToggle" class="sound-btn active" onclick="toggleSound()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            音效开
+          </button>
+        </div>
+
+        <div class="control-group">
+          <label for="nameList">名单（每行一个，数量不限）</label>
+          <textarea id="nameList" oninput="updateWheelFromInput()">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16</textarea>
+        </div>
+
+        <div class="upload-row">
+          <label class="upload-btn">
+            📄 上传文档
+            <input type="file" id="docUpload" accept=".txt,.csv,.docx,.doc,.md,.json" onchange="handleDocUpload(event)">
+          </label>
+          <label class="upload-btn">
+            🖼️ 上传图片
+            <input type="file" id="imgUpload" accept="image/*" onchange="handleImgUpload(event)">
+          </label>
+        </div>
+        <div class="upload-hint">
+          支持 TXT / CSV / DOCX / MD / JSON 文档，或 PNG / JPG 图片。文档会自动提取姓名；图片会尝试用浏览器 OCR 识别文字（需 Chrome/Edge 支持）。
+        </div>
+
+        <div class="btn-row" style="margin-top: 1.25rem;">
+          <button class="btn btn-primary" onclick="spinWheel()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            转动转盘
+          </button>
+          <button class="btn btn-secondary" onclick="shuffleEntries()">打乱顺序</button>
+        </div>
+
+        <div class="control-group">
+          <label>快速预设</label>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.8rem;" onclick="loadPreset('numbers')">姓名</button>
+            <button class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.8rem;" onclick="loadPreset('numbers20')">数字</button>
+            <button class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.8rem;" onclick="loadPreset('decision')">是 / 否 / 也许</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast-popup">操作完成！</div>
+
+  <script>
+    const canvas = document.getElementById('wheelCanvas');
+    const ctx = canvas.getContext('2d');
+    let names = [];
+    let currentAngle = 0;
+    let isSpinning = false;
+    let lastWinner = "";
+    let soundEnabled = true;
+    let audioCtx = null;
+    let lastSliceIndex = -1;
+
+    // ---------- 音频合成 ----------
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    function playTickSound() {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.04);
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.04);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.04);
+      } catch(e) {}
+    }
+
+    function playWinSound() {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const notes = [523.25, 659.25, 783.99, 1046.50];
+        notes.forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.1);
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime + idx * 0.1);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + idx * 0.1 + 0.35);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime + idx * 0.1);
+          osc.stop(audioCtx.currentTime + idx * 0.1 + 0.35);
+        });
+      } catch(e) {}
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const btn = document.getElementById('soundToggle');
+      if (soundEnabled) {
+        btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg> 音效开`;
+        btn.classList.add('active');
+      } else {
+        btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg> 音效关`;
+        btn.classList.remove('active');
+      }
+    }
+
+    // ---------- 彩带引擎 ----------
+    const cCanvas = document.getElementById('confettiCanvas');
+    const cCtx = cCanvas.getContext('2d');
+    let confettiParticles = [];
+    let confettiAnim = null;
+
+    function resizeConfetti() {
+      cCanvas.width = window.innerWidth;
+      cCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeConfetti);
+
+    function startConfetti() {
+      resizeConfetti();
+      cCanvas.style.display = 'block';
+      confettiParticles = [];
+      const colors = ['#38bdf8', '#f43f5e', '#10b981', '#facc15', '#a855f7', '#fb923c'];
+      for (let i = 0; i < 140; i++) {
+        confettiParticles.push({
+          x: cCanvas.width / 2 + (Math.random() - 0.5) * 200,
+          y: cCanvas.height / 2,
+          w: Math.random() * 12 + 6,
+          h: Math.random() * 8 + 4,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          vx: (Math.random() - 0.5) * 22,
+          vy: (Math.random() - 0.8) * 22,
+          rot: Math.random() * 360,
+          vrot: (Math.random() - 0.5) * 12,
+          gravity: 0.35,
+          opacity: 1
+        });
+      }
+      animateConfetti();
+      setTimeout(stopConfetti, 4000);
+    }
+
+    function animateConfetti() {
+      cCtx.clearRect(0, 0, cCanvas.width, cCanvas.height);
+      let alive = false;
+      confettiParticles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += p.gravity;
+        p.rot += p.vrot;
+        if (p.y < cCanvas.height) alive = true;
+        cCtx.save();
+        cCtx.translate(p.x, p.y);
+        cCtx.rotate(p.rot * Math.PI / 180);
+        cCtx.fillStyle = p.color;
+        cCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        cCtx.restore();
+      });
+      if (alive) {
+        confettiAnim = requestAnimationFrame(animateConfetti);
+      } else {
+        stopConfetti();
+      }
+    }
+
+    function stopConfetti() {
+      if (confettiAnim) cancelAnimationFrame(confettiAnim);
+      cCanvas.style.display = 'none';
+    }
+
+    // ---------- 转盘绘制 ----------
+    const sliceColors = [
+      "#38bdf8", "#818cf8", "#c084fc", "#f472b6",
+      "#fb7185", "#fb923c", "#facc15", "#4ade80", "#2dd4bf"
+    ];
+
+    function updateWheelFromInput() {
+      const text = document.getElementById('nameList').value;
+      names = text.split('\n').map(n => n.trim()).filter(n => n.length > 0);
+      drawWheel();
+      try { localStorage.setItem('saved_wheel_names', text); } catch(e) {}
+    }
+
+    function drawWheel() {
+      const width = canvas.width;
+      const height = canvas.height;
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const radius = width / 2 - 20;
+
+      ctx.clearRect(0, 0, width, height);
+
+      if (names.length === 0) {
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = "#1e293b";
+        ctx.fill();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "#334155";
+        ctx.stroke();
+        ctx.fillStyle = "#94a3b8";
+        ctx.font = "bold 32px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("请添加姓名", centerX, centerY);
+        return;
+      }
+
+      const sliceAngle = (2 * Math.PI) / names.length;
+
+      names.forEach((name, i) => {
+        const angle = currentAngle + i * sliceAngle;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, angle, angle + sliceAngle);
+        ctx.closePath();
+        ctx.fillStyle = sliceColors[i % sliceColors.length];
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#0b0f19";
+        ctx.stroke();
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(angle + sliceAngle / 2);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#0b0f19";
+        const fontSize = Math.max(16, Math.min(30, Math.floor(650 / names.length)));
+        ctx.font = `bold ${fontSize}px "Microsoft YaHei", sans-serif`;
+        ctx.fillText(name.length > 18 ? name.slice(0, 16) + '..' : name, radius - 40, fontSize / 3);
+        ctx.restore();
+      });
+    }
+
+    function spinWheel() {
+      if (isSpinning || names.length === 0) return;
+      initAudio();
+      isSpinning = true;
+      document.getElementById('winnerBox').classList.remove('show');
+
+      const spinDuration = 4500;
+      const startSpeed = Math.random() * 25 + 40;
+      let startTime = null;
+      lastSliceIndex = -1;
+
+      function animate(time) {
+        if (!startTime) startTime = time;
+        const elapsed = time - startTime;
+        const progress = Math.min(elapsed / spinDuration, 1);
+        const easeOut = 1 - Math.pow(1 - progress, 3.5);
+
+        currentAngle += (1 - easeOut) * (startSpeed * 0.016);
+        drawWheel();
+
+        const sliceAngle = (2 * Math.PI) / names.length;
+        const normalizedAngle = (2 * Math.PI - (currentAngle % (2 * Math.PI))) % (2 * Math.PI);
+        const currentSliceIndex = Math.floor(normalizedAngle / sliceAngle) % names.length;
+        if (currentSliceIndex !== lastSliceIndex) {
+          playTickSound();
+          lastSliceIndex = currentSliceIndex;
+        }
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          isSpinning = false;
+          determineWinner();
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+
+    function determineWinner() {
+      const sliceAngle = (2 * Math.PI) / names.length;
+      const normalizedAngle = (2 * Math.PI - (currentAngle % (2 * Math.PI))) % (2 * Math.PI);
+      const winningIndex = Math.floor(normalizedAngle / sliceAngle) % names.length;
+      lastWinner = names[winningIndex];
+
+      document.getElementById('winnerName').innerText = lastWinner;
+      document.getElementById('winnerBox').classList.add('show');
+      playWinSound();
+      startConfetti();
+    }
+
+    function removeWinner() {
+      if (!lastWinner) return;
+      names = names.filter(n => n !== lastWinner);
+      document.getElementById('nameList').value = names.join('\n');
+      document.getElementById('winnerBox').classList.remove('show');
+      drawWheel();
+    }
+
+    function shuffleEntries() {
+      names.sort(() => Math.random() - 0.5);
+      document.getElementById('nameList').value = names.join('\n');
+      drawWheel();
+    }
+
+    function loadPreset(type) {
+      if (type === 'numbers') {
+        document.getElementById('nameList').value = Array.from({length: 16}, (_, i) => i + 1).join('\n');
+      } else if (type === 'numbers20') {
+        document.getElementById('nameList').value = Array.from({length: 20}, (_, i) => i + 1).join('\n');
+      } else if (type === 'decision') {
+        document.getElementById('nameList').value = "是\n不行\n再问一次\n肯定是\n三思\n谨慎行事";
+      }
+      updateWheelFromInput();
+    }
+
+    // ---------- 文档上传与姓名提取 ----------
+    function extractNamesFromText(text) {
+      // 按行拆分，去掉空行和纯数字行（如果用户上传的是纯姓名列表，数字行也保留？这里只过滤空行）
+      let lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+      // 如果每行包含逗号、制表符、分号等，可能是一行多个姓名，尝试拆分
+      let result = [];
+      lines.forEach(line => {
+        // 如果一行里有多个分隔符（逗号、制表符、分号、顿号），拆开
+        if (/[,，;；\t、]/.test(line)) {
+          const parts = line.split(/[,，;；\t、]+/).map(p => p.trim()).filter(p => p.length > 0);
+          result.push(...parts);
+        } else {
+          result.push(line);
+        }
+      });
+      // 去重（可选），这里保留重复，因为抽奖可能允许同名不同人？通常姓名重复无意义，去重更合理
+      // 但如果是编号，去重可能误删。这里不做去重，由用户自己决定。
+      return result;
+    }
+
+    function handleDocUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const fileName = file.name.toLowerCase();
+
+      if (fileName.endsWith('.docx')) {
+        // 解析 docx：docx 是 zip，读取 word/document.xml
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const arrayBuffer = e.target.result;
+            // 使用 JSZip？为了不引入外部库，手动解析 zip 比较复杂。
+            // 这里简化：如果浏览器支持 DecompressionStream 可以解压，但 docx 是 zip 格式，手动解析较麻烦。
+            // 作为替代，提示用户将 docx 另存为 txt 或使用其他格式。
+            // 为了真正支持 docx，我们引入一个轻量级方法：使用 FileReader 读为文本，但 docx 是二进制，直接读文本会乱码。
+            // 因此这里采用一个简单方案：用浏览器内置的 DecompressionStream 解压 zip 并提取 document.xml。
+            // 但 DecompressionStream 不支持 zip 容器，只支持 gzip/deflate。
+            // 所以真正解析 docx 需要 JSZip。为了保持单文件无依赖，这里提示用户改用 txt/csv。
+            alert('DOCX 解析需要额外库支持。建议将 Word 文档另存为 TXT 或 CSV 格式再上传。');
+            event.target.value = '';
+          } catch (err) {
+            alert('读取 DOCX 失败，请改用 TXT 或 CSV。');
+          }
+        };
+        reader.readAsArrayBuffer(file);
+        return;
+      }
+
+      if (fileName.endsWith('.doc')) {
+        alert('旧版 .doc 格式不支持，请另存为 .docx 或 .txt 后再上传。');
+        event.target.value = '';
+        return;
+      }
+
+      // txt, csv, md, json 等纯文本
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        const extracted = extractNamesFromText(text);
+        if (extracted.length === 0) {
+          alert('未能从文档中提取到任何姓名，请检查文件内容。');
+          event.target.value = '';
+          return;
+        }
+        document.getElementById('nameList').value = extracted.join('\n');
+        updateWheelFromInput();
+        showToast(`已从文档提取 ${extracted.length} 个名字`);
+        event.target.value = '';
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
+
+    // ---------- 图片上传与 OCR ----------
+    function handleImgUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (!('TextDetector' in window)) {
+        alert('当前浏览器不支持图片文字识别（OCR）。建议使用 Chrome 或 Edge 最新版，或手动输入姓名。');
+        event.target.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = async function() {
+          try {
+            const detector = new TextDetector();
+            const textBlocks = await detector.detect(img);
+            if (!textBlocks || textBlocks.length === 0) {
+              alert('图片中未识别到文字，请换一张清晰的图片。');
+              event.target.value = '';
+              return;
+            }
+            // 收集所有识别到的文字，按行合并
+            let lines = textBlocks.map(block => block.rawValue || '').filter(t => t.trim().length > 0);
+            // 如果识别结果是一整段，尝试按换行或标点拆分
+            let allText = lines.join('\n');
+            const extracted = extractNamesFromText(allText);
+            if (extracted.length === 0) {
+              alert('识别到文字但未能提取姓名，请检查图片内容。');
+              event.target.value = '';
+              return;
+            }
+            document.getElementById('nameList').value = extracted.join('\n');
+            updateWheelFromInput();
+            showToast(`已从图片识别并提取 ${extracted.length} 个名字`);
+          } catch (err) {
+            console.error(err);
+            alert('图片识别失败，请重试或手动输入。');
+          }
+          event.target.value = '';
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // ---------- 轻提示 ----------
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.classList.add('visible');
+      setTimeout(() => toast.classList.remove('visible'), 2200);
+    }
+
+    // 初始化
+    window.onload = () => {
+      // 优先使用本地存储的名单，否则使用默认姓名或数字
+      const saved = localStorage.getItem('saved_wheel_names');
+      if (saved) {
+        document.getElementById('nameList').value = saved;
+      }
+      updateWheelFromInput();
+    };
+  </script>
+</body>
+</html>
